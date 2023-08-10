@@ -1,20 +1,16 @@
 extern crate bindgen;
 
-use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
-use std::collections::HashSet;
+use bindgen::callbacks::{
+	EnumVariantValue, ItemInfo, ItemKind, MacroParsingBehavior, ParseCallbacks,
+};
+use convert_case::{Case, Casing};
 use std::env;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
-struct MacroCallback {
-	macros: Arc<RwLock<HashSet<String>>>,
-}
-
+struct MacroCallback;
 impl ParseCallbacks for MacroCallback {
 	fn will_parse_macro(&self, name: &str) -> MacroParsingBehavior {
-		self.macros.write().unwrap().insert(name.into());
-
 		match name {
 			"FP_NAN" => MacroParsingBehavior::Ignore,
 			"FP_INFINITE" => MacroParsingBehavior::Ignore,
@@ -23,6 +19,43 @@ impl ParseCallbacks for MacroCallback {
 			"FP_NORMAL" => MacroParsingBehavior::Ignore,
 			_ => MacroParsingBehavior::Default,
 		}
+	}
+	fn generated_name_override(&self, item_info: ItemInfo<'_>) -> Option<String> {
+		if let ItemKind::Var = item_info.kind {
+			Some(item_info.name.to_case(Case::Pascal))
+		} else {
+			None
+		}
+	}
+	fn item_name(&self, original_item_name: &str) -> Option<String> {
+		if original_item_name.ends_with('_') {
+			Some(original_item_name.to_case(Case::Pascal))
+		} else {
+			None
+		}
+	}
+	fn enum_variant_name(
+		&self,
+		enum_name: Option<&str>,
+		original_variant_name: &str,
+		_variant_value: EnumVariantValue,
+	) -> Option<String> {
+		let mut name = original_variant_name.to_string();
+		if let Some(enum_name) = enum_name {
+			let enum_name = enum_name.trim_start_matches("enum ");
+			// don't want DepthMode::DepthModeD32 because that's redundant!
+			name = name.trim_start_matches(enum_name).to_string();
+			// but rust won't let us make an enum value starting with a number so :/
+			if name.starts_with(char::is_numeric) {
+				name = dbg!(enum_name
+					.trim_end_matches('_')
+					.split('_')
+					.last()
+					.unwrap()
+					.to_string()) + &name;
+			}
+		}
+		Some(name.to_case(Case::Pascal))
 	}
 }
 
@@ -124,7 +157,6 @@ fn main() {
 	}
 
 	// Generate bindings to StereoKitC.
-	let macros = Arc::new(RwLock::new(HashSet::new()));
 	let bindings = bindgen::Builder::default()
 		.header("src/static-wrapper.h")
 		.blocklist_type("color128")
@@ -219,7 +251,11 @@ fn main() {
 		.blocklist_function("y0l")
 		.blocklist_function("y1l")
 		.blocklist_function("ynl")
-		.parse_callbacks(Box::new(MacroCallback { macros }))
+		.generate_block(true)
+		.prepend_enum_name(false)
+		.rustified_enum(".*")
+		.disable_name_namespacing()
+		.parse_callbacks(Box::new(MacroCallback))
 		.generate()
 		.expect("Unable to generate bindings");
 

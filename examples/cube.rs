@@ -6,13 +6,14 @@ fn main() {
 		if sk_init(sk_settings_t {
 			app_name: ptr::null(),
 			assets_folder: ptr::null(),
-			display_preference: 0,
-			blend_preference: 0,
+			display_preference: DisplayMode::Mixedreality,
+			blend_preference: DisplayBlend::AnyTransparent,
 			no_flatscreen_fallback: 0,
-			depth_mode: 0,
-			log_filter: 0,
+			depth_mode: DepthMode::D32,
+			log_filter: Log::Diagnostic,
 			overlay_app: 0,
 			overlay_priority: 0,
+			origin: OriginMode::Floor,
 			flatscreen_pos_x: 0,
 			flatscreen_pos_y: 0,
 			flatscreen_width: 0,
@@ -55,6 +56,6 @@ unsafe extern "C" fn step() {
 			b: 1.0,
 			a: 1.0,
 		},
-		1,
+		RenderLayer::Layer0,
 	);
 }

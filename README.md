@@ -1,2 +1,3 @@
-# stereokit-sys
-Low-Level Rust bindings around the StereoKitC library for XR
+# stereokit-autogen
+
+Automatically generated Rust bindings around the StereoKitC library for XR, made straight from the C!
