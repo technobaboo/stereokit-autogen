@@ -1,8 +1,9 @@
 extern crate bindgen;
 
 use bindgen::callbacks::{
-	EnumVariantValue, ItemInfo, ItemKind, MacroParsingBehavior, ParseCallbacks,
+	DeriveInfo, EnumVariantValue, ItemInfo, ItemKind, MacroParsingBehavior, ParseCallbacks,
 };
+use bindgen::AliasVariation;
 use convert_case::{Case, Casing};
 use std::env;
 use std::path::PathBuf;
@@ -27,9 +28,16 @@ impl ParseCallbacks for MacroCallback {
 			None
 		}
 	}
+	// fn process_comment(&self, _comment: &str) -> Option<String> {}
 	fn item_name(&self, original_item_name: &str) -> Option<String> {
 		if original_item_name.ends_with('_') {
 			Some(original_item_name.to_case(Case::Pascal))
+		} else if !original_item_name.starts_with('_') && original_item_name.ends_with("_t") {
+			Some(
+				original_item_name
+					.trim_end_matches("_t")
+					.to_case(Case::Pascal),
+			)
 		} else {
 			None
 		}
@@ -56,6 +64,14 @@ impl ParseCallbacks for MacroCallback {
 			}
 		}
 		Some(name.to_case(Case::Pascal))
+	}
+	fn add_derives(&self, info: &DeriveInfo<'_>) -> Vec<String> {
+		let mut derives = Vec::new();
+		if info.name.starts_with("color") && cfg!(feature = "serde") {
+			derives.push("Serialize".to_string());
+			derives.push("Deserialize".to_string());
+		}
+		derives
 	}
 }
 
@@ -159,103 +175,34 @@ fn main() {
 	// Generate bindings to StereoKitC.
 	let bindings = bindgen::Builder::default()
 		.header("src/static-wrapper.h")
-		.blocklist_type("color128")
-		.blocklist_type("color32")
-		.blocklist_type("FP_NAN")
-		.blocklist_type("FP_INFINITE")
-		.blocklist_type("FP_ZERO")
-		.blocklist_type("FP_SUBNORMAL")
-		.blocklist_type("FP_NORMAL")
-		.blocklist_function("_.*")
-		// Blocklist functions with u128 in signature.
-		// https://github.com/zmwangx/rust-ffmpeg-sys/issues/1
-		// https://github.com/rust-lang/rust-bindgen/issues/1549
-		.blocklist_function("acoshl")
-		.blocklist_function("acosl")
-		.blocklist_function("asinhl")
-		.blocklist_function("asinl")
-		.blocklist_function("atan2l")
-		.blocklist_function("atanhl")
-		.blocklist_function("atanl")
-		.blocklist_function("cbrtl")
-		.blocklist_function("ceill")
-		.blocklist_function("copysignl")
-		.blocklist_function("coshl")
-		.blocklist_function("cosl")
-		.blocklist_function("dreml")
-		.blocklist_function("ecvt_r")
-		.blocklist_function("erfcl")
-		.blocklist_function("erfl")
-		.blocklist_function("exp2l")
-		.blocklist_function("expl")
-		.blocklist_function("expm1l")
-		.blocklist_function("fabsl")
-		.blocklist_function("fcvt_r")
-		.blocklist_function("fdiml")
-		.blocklist_function("finitel")
-		.blocklist_function("floorl")
-		.blocklist_function("fmal")
-		.blocklist_function("fmaxl")
-		.blocklist_function("fminl")
-		.blocklist_function("fmodl")
-		.blocklist_function("frexpl")
-		.blocklist_function("gammal")
-		.blocklist_function("hypotl")
-		.blocklist_function("ilogbl")
-		.blocklist_function("isinfl")
-		.blocklist_function("isnanl")
-		.blocklist_function("j0l")
-		.blocklist_function("j1l")
-		.blocklist_function("jnl")
-		.blocklist_function("ldexpl")
-		.blocklist_function("lgammal")
-		.blocklist_function("lgammal_r")
-		.blocklist_function("llrintl")
-		.blocklist_function("llroundl")
-		.blocklist_function("log10l")
-		.blocklist_function("log1pl")
-		.blocklist_function("log2l")
-		.blocklist_function("logbl")
-		.blocklist_function("logl")
-		.blocklist_function("lrintl")
-		.blocklist_function("lroundl")
-		.blocklist_function("modfl")
-		.blocklist_function("nanl")
-		.blocklist_function("nearbyintl")
-		.blocklist_function("nextafterl")
-		.blocklist_function("nexttoward")
-		.blocklist_function("nexttowardf")
-		.blocklist_function("nexttowardl")
-		.blocklist_function("powl")
-		.blocklist_function("qecvt")
-		.blocklist_function("qecvt_r")
-		.blocklist_function("qfcvt")
-		.blocklist_function("qfcvt_r")
-		.blocklist_function("qgcvt")
-		.blocklist_function("remainderl")
-		.blocklist_function("remquol")
-		.blocklist_function("rintl")
-		.blocklist_function("roundl")
-		.blocklist_function("scalbl")
-		.blocklist_function("scalblnl")
-		.blocklist_function("scalbnl")
-		.blocklist_function("significandl")
-		.blocklist_function("sinhl")
-		.blocklist_function("sinl")
-		.blocklist_function("sqrtl")
-		.blocklist_function("strtold")
-		.blocklist_function("tanhl")
-		.blocklist_function("tanl")
-		.blocklist_function("tgammal")
-		.blocklist_function("truncl")
-		.blocklist_function("y0l")
-		.blocklist_function("y1l")
-		.blocklist_function("ynl")
+		// what to generate
+		.allowlist_recursively(false)
+		.allowlist_file(".*stereokit.*")
+		.allowlist_type("char32_t")
+		.allowlist_type("uint_least32_t")
+		.allowlist_type("__uint.+")
+		.blocklist_function(".+_16")
+		// .blocklist_type("_.+")
+		// how to generate
+		// assets
+		.opaque_type("_.+_t")
+		.default_alias_style(AliasVariation::NewType)
+		.no_copy(".+_t")
+		.no_debug(".+_t")
+		// comments
+		.generate_comments(true)
+		.clang_arg("-fparse-all-comments")
+		// syntax
+		.derive_copy(true)
 		.generate_block(true)
 		.prepend_enum_name(false)
 		.rustified_enum(".*")
 		.disable_name_namespacing()
+		.layout_tests(false)
 		.parse_callbacks(Box::new(MacroCallback))
+		.default_macro_constant_type(bindgen::MacroTypeVariation::Unsigned)
+		.generate_cstr(true)
+		// generate!
 		.generate()
 		.expect("Unable to generate bindings");
 

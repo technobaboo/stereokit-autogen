@@ -55,7 +55,6 @@ optional = true
 features = ["std"]
 
 [build-dependencies]
-bindgen = "0.64.0"
+bindgen = "0.66.1"
 cmake = "0.1.49"
 convert_case = "0.6.0"
-

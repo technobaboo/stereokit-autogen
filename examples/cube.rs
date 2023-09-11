@@ -3,29 +3,30 @@ use std::ptr;
 use stereokit_sys::*;
 fn main() {
 	unsafe {
-		if sk_init(sk_settings_t {
+		if sk_init(SkSettings {
 			app_name: ptr::null(),
 			assets_folder: ptr::null(),
 			display_preference: DisplayMode::Mixedreality,
 			blend_preference: DisplayBlend::AnyTransparent,
-			no_flatscreen_fallback: 0,
+			no_flatscreen_fallback: false.into(),
 			depth_mode: DepthMode::D32,
 			log_filter: Log::Diagnostic,
-			overlay_app: 0,
+			overlay_app: false.into(),
 			overlay_priority: 0,
 			origin: OriginMode::Floor,
 			flatscreen_pos_x: 0,
 			flatscreen_pos_y: 0,
 			flatscreen_width: 0,
 			flatscreen_height: 0,
-			disable_flatscreen_mr_sim: 0,
-			disable_desktop_input_window: 0,
-			disable_unfocused_sleep: 0,
+			disable_flatscreen_mr_sim: false.into(),
+			disable_desktop_input_window: false.into(),
+			disable_unfocused_sleep: false.into(),
 			render_scaling: 1.0,
 			render_multisample: 0,
 			android_java_vm: ptr::null_mut(),
 			android_activity: ptr::null_mut(),
-		}) == 0
+		})
+		.into()
 		{
 			panic!("Unable to initialize StereoKit");
 		}
@@ -36,8 +37,8 @@ fn main() {
 
 unsafe extern "C" fn step() {
 	mesh_draw(
-		mesh_find(std::mem::transmute(default_id_mesh_cube)),
-		material_find(std::mem::transmute(default_id_material_ui_box)),
+		mesh_find(default_id_mesh_cube.as_ptr()),
+		material_find(default_id_material_ui_box.as_ptr()),
 		matrix_ts(
 			vec3 {
 				x: 0.0,
